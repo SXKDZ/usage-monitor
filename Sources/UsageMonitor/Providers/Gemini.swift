@@ -34,11 +34,12 @@ enum GeminiProvider {
 
         let tier = await assist?["paidTier"] as? JSON
         // An omitted creditAmount means a zero balance (proto3 default).
-        let credits = (tier?["availableCredits"] as? [JSON]).map {
-            $0.reduce(0) { $0 + Int(num($1["creditAmount"]) ?? 0) }
-        }
+        let balances = (tier?["availableCredits"] as? [JSON]).map { credits -> [Balance] in
+            let amount = credits.reduce(0.0) { $0 + (num($1["creditAmount"]) ?? 0) }
+            return [.credits(amount, unit: "AI credits", help: "Google One AI credits, used once your plan's quota runs out")]
+        } ?? []
         return ProviderUsage(kind: .gemini, plan: tier?["name"] as? String ?? "Antigravity",
-                             account: email, windows: windows, credits: credits)
+                             account: email, windows: windows, balances: balances)
     }
 
     /// Same host and client identity as `agy`: the server only returns the Gemini group

@@ -36,7 +36,15 @@ enum CodexProvider {
         collect(json["rate_limit"])
         collect(json["code_review_rate_limit"], prefix: "Code review")
         usage.windows = windows.sorted { $0.seconds < $1.seconds }.map(\.window)
-        usage.resets = num((json["rate_limit_reset_credits"] as? JSON)?["available_count"]).map { Int($0) }
+        if let resets = num((json["rate_limit_reset_credits"] as? JSON)?["available_count"]) {
+            usage.balances.append(.resets(Int(resets)))
+        }
+        if let credits = json["credits"] as? JSON {
+            let help = "Codex credits, used once your plan's limits run out"
+            usage.balances.append(credits["unlimited"] as? Bool == true
+                ? Balance(symbol: "creditcard.fill", text: "Unlimited credits", available: true, help: help)
+                : .credits(num(credits["balance"]) ?? 0, unit: "credits", help: help))
+        }
         return usage
     }
 

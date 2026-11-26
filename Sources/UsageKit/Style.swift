@@ -28,7 +28,27 @@ public extension ProviderUsage.Kind {
     var tint: Color { colors[1] }
 }
 
-/// Orange from 75 % used, red from 90 % used.
+// MARK: - Used / left
+
+private struct ShowsRemainingKey: EnvironmentKey { static let defaultValue = false }
+
+public extension EnvironmentValues {
+    /// Show what's left of each limit instead of what's used.
+    var showsRemaining: Bool {
+        get { self[ShowsRemainingKey.self] }
+        set { self[ShowsRemainingKey.self] = newValue }
+    }
+}
+
+public extension UsageWindow {
+    /// The fraction to display: what's used, or what's left.
+    func shown(remaining: Bool) -> Double { remaining ? max(0, 1 - used) : used }
+}
+
+/// "used" or "left", for labels like "72% used".
+public func metricName(remaining: Bool) -> String { remaining ? "left" : "used" }
+
+/// Orange from 75 % used, red from 90 % used (whichever way the percentage is shown).
 public func warningColor(_ used: Double) -> Color? {
     used >= 0.9 ? .red : used >= 0.75 ? .orange : nil
 }
@@ -72,6 +92,8 @@ public struct LimitRow: View {
         self.density = density
     }
 
+    @Environment(\.showsRemaining) private var remaining
+
     private var compact: Bool { density != .regular }
 
     public var body: some View {
@@ -81,19 +103,21 @@ public struct LimitRow: View {
                 Text(density == .mini ? window.shortLabel : window.label)
                     .font(compact ? .caption.weight(.medium) : .subheadline.weight(.medium))
                     .lineLimit(1)
+                    // Sized first, so it keeps its natural width whenever it fits.
+                    .layoutPriority(1)
                 // compact (large widget) keeps the countdown on this line so every limit fits without scrolling
                 if density == .compact, let reset = window.resetsAt { resetLabel(reset).padding(.leading, 4) }
                 Spacer(minLength: 4)
-                let percent = Text(window.used, format: .percent.precision(.fractionLength(0)))
+                let percent = Text(window.shown(remaining: remaining), format: .percent.precision(.fractionLength(0)))
                     .fontWeight(.semibold)
                     .foregroundStyle(warning ?? .primary)
                 Text(density == .mini || density == .tile
-                     ? "\(percent)" : "\(percent) \(Text("used").foregroundStyle(.secondary))")
+                     ? "\(percent)" : "\(percent) \(Text(metricName(remaining: remaining)).foregroundStyle(.secondary))")
                     .font(.system(compact ? .caption : .subheadline, design: .rounded))
                     .monospacedDigit()
-                    .lineLimit(1)
+                    .fixedSize()
             }
-            UsageBar(value: window.used, colors: warning.map { [$0.opacity(0.8), $0] } ?? kind.colors)
+            UsageBar(value: window.shown(remaining: remaining), colors: warning.map { [$0.opacity(0.8), $0] } ?? kind.colors)
                 .frame(height: compact ? 4 : 6)
             if density != .compact {
                 if let reset = window.resetsAt {
@@ -166,39 +190,75 @@ public struct UsageBar: View {
     }
 }
 
-/// A labeled count in a pill, e.g. "4 resets" or "0 AI credits".
-public struct CountChip: View {
-    let count: Int
-    let unit: (one: String, many: String)
-    let symbol: String
-    let help: String
+/// A balance as a pill, orange when there's something to use.
+public struct BalanceChip: View {
+    let balance: Balance
+    var compact = false
 
-    public static func resets(_ count: Int) -> CountChip {
-        CountChip(count: count, unit: ("reset", "resets"), symbol: "ticket.fill",
-                  help: "Limit resets you can redeem")
-    }
-
-    public static func credits(_ count: Int) -> CountChip {
-        CountChip(count: count, unit: ("AI credit", "AI credits"), symbol: "sparkles",
-                  help: "Google One AI credits, used once your plan's quota runs out")
+    public init(_ balance: Balance, compact: Bool = false) {
+        self.balance = balance
+        self.compact = compact
     }
 
     public var body: some View {
-        Label("\(count.formatted()) \(count == 1 ? unit.one : unit.many)", systemImage: symbol)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .foregroundStyle(count > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+        Label(balance.text, systemImage: balance.symbol)
+            .labelStyle(ChipLabelStyle())
+            .font(compact ? .system(size: 9.5, weight: .semibold) : .caption2.weight(.semibold))
+            .padding(.horizontal, compact ? 5 : 7)
+            .padding(.vertical, compact ? 2 : 3)
+            .foregroundStyle(balance.available ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
             .background(Color.primary.opacity(0.06), in: Capsule())
             .fixedSize()
-            .help(help)
+            .help(balance.help)
     }
 }
 
-public extension ProviderUsage {
-    /// Pills for whatever extras this tool reports.
-    @ViewBuilder var chips: some View {
-        if let resets { CountChip.resets(resets) }
-        if let credits { CountChip.credits(credits) }
+private struct ChipLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) { configuration.icon; configuration.title }
+    }
+}
+
+/// Tool name and plan, then the signed-in account with its balances. Shared by the popover and widgets.
+public struct ProviderHeader: View {
+    let usage: ProviderUsage
+    var compact = false
+
+    public init(usage: ProviderUsage, compact: Bool = false) {
+        self.usage = usage
+        self.compact = compact
+    }
+
+    public var body: some View {
+        HStack(spacing: compact ? 7 : 9) {
+            ProviderMark(kind: usage.kind, size: compact ? 26 : 30)
+            VStack(alignment: .leading, spacing: compact ? 1 : 2) {
+                HStack(spacing: 6) {
+                    Text(usage.kind.title)
+                        .font(compact ? .caption.weight(.semibold) : .system(.headline, design: .rounded))
+                        .lineLimit(1)
+                    if let plan = usage.plan {
+                        Text(plan)
+                            .font(compact ? .system(size: 9.5, weight: .semibold) : .caption2.weight(.semibold))
+                            .padding(.horizontal, compact ? 5 : 6)
+                            .padding(.vertical, compact ? 1 : 2)
+                            .foregroundStyle(usage.kind.tint)
+                            .background(usage.kind.tint.opacity(0.14), in: Capsule())
+                            .lineLimit(1)
+                    }
+                }
+                HStack(spacing: 4) {
+                    if let account = usage.account {
+                        Text(account)
+                            .font(compact ? .caption2 : .caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Spacer(minLength: 4)
+                    ForEach(usage.balances, id: \.self) { BalanceChip($0, compact: compact) }
+                }
+            }
+        }
     }
 }

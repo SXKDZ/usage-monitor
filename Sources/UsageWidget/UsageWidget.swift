@@ -16,6 +16,7 @@ struct UsageWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "UsageWidget", provider: Provider()) { entry in
             UsageWidgetView(entry: entry)
+                .environment(\.showsRemaining, entry.snapshot?.showsRemaining ?? false)
                 .containerBackground(.background, for: .widget)
         }
         .configurationDisplayName("AI Usage")
@@ -88,6 +89,7 @@ struct UsageWidgetView: View {
 /// Small: each tool's most-used limit.
 private struct SmallView: View {
     let usages: [ProviderUsage]
+    @Environment(\.showsRemaining) private var remaining
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -104,19 +106,19 @@ private struct SmallView: View {
                         .lineLimit(1)
                         Spacer(minLength: 2)
                         if let top {
-                            Text(top.used, format: .percent.precision(.fractionLength(0)))
+                            Text(top.shown(remaining: remaining), format: .percent.precision(.fractionLength(0)))
                                 .font(.system(.callout, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(warningColor(top.used) ?? .primary)
                         }
                     }
                     let warning = top.flatMap { warningColor($0.used) }
-                    UsageBar(value: top?.used ?? 0, colors: warning.map { [$0.opacity(0.8), $0] } ?? usage.kind.colors)
+                    UsageBar(value: top?.shown(remaining: remaining) ?? 0, colors: warning.map { [$0.opacity(0.8), $0] } ?? usage.kind.colors)
                         .frame(height: 4)
                 }
                 .frame(maxHeight: .infinity)
             }
-            Text("% of limit used").font(.system(size: 9)).foregroundStyle(.tertiary)
+            Text("% of limit \(metricName(remaining: remaining))").font(.system(size: 9)).foregroundStyle(.tertiary)
         }
     }
 }
@@ -124,6 +126,7 @@ private struct SmallView: View {
 /// Medium: one column per tool with its first two limits.
 private struct MediumView: View {
     let usages: [ProviderUsage]
+    @Environment(\.showsRemaining) private var remaining
     let now: Date
 
     var body: some View {
@@ -146,7 +149,7 @@ private struct MediumView: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            Text("% of limit used").font(.system(size: 9)).foregroundStyle(.tertiary)
+            Text("% of limit \(metricName(remaining: remaining))").font(.system(size: 9)).foregroundStyle(.tertiary)
         }
     }
 }
@@ -157,7 +160,7 @@ private struct LargeView: View {
     let now: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("AI Usage").font(.system(.headline, design: .rounded))
                 Spacer()
@@ -165,17 +168,8 @@ private struct LargeView: View {
                     .font(.caption2).foregroundStyle(.secondary)
             }
             ForEach(snapshot.usages) { usage in
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 6) {
-                        ProviderMark(kind: usage.kind, size: 18)
-                        Text(usage.kind.title).font(.caption.weight(.semibold))
-                        if let account = usage.account {
-                            Text(account).font(.caption2).foregroundStyle(.secondary)
-                                .lineLimit(1).truncationMode(.middle)
-                        }
-                        Spacer(minLength: 4)
-                        usage.chips
-                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    ProviderHeader(usage: usage, compact: true)
                     ForEach(usage.activeWindows.prefix(3)) {
                         LimitRow(window: $0, kind: usage.kind, now: now, density: .compact)
                     }

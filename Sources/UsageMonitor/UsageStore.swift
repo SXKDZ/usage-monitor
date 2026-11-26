@@ -9,6 +9,14 @@ final class UsageStore {
     private(set) var isLoading = false
     private(set) var updatedAt: Date?
 
+    /// The Used / Left switch; remembered across launches and passed on to the widgets.
+    var showsRemaining = UserDefaults.standard.bool(forKey: "showsRemaining") {
+        didSet {
+            UserDefaults.standard.set(showsRemaining, forKey: "showsRemaining")
+            publish()
+        }
+    }
+
     /// Highest usage across every window — "how close am I to any limit".
     var peak: Double? { usages.flatMap(\.windows).map(\.used).max() }
 
@@ -42,9 +50,13 @@ final class UsageStore {
             return kept
         }
         updatedAt = .now
-        if Snapshot(usages: usages, updatedAt: .now).save() {
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        publish()
+    }
+
+    /// Hands the latest numbers and display setting to the widgets.
+    private func publish() {
+        let snapshot = Snapshot(usages: usages, updatedAt: updatedAt ?? .now, showsRemaining: showsRemaining)
+        if snapshot.save() { WidgetCenter.shared.reloadAllTimelines() }
     }
 
     nonisolated static func fetchAll() async -> [ProviderUsage] {

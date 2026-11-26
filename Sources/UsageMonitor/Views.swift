@@ -12,6 +12,7 @@ struct ContentView: View {
             header
             ForEach(store.usages) { ProviderCard(usage: $0) }
         }
+        .environment(\.showsRemaining, store.showsRemaining)
         .padding(14)
         .frame(width: 340)
         .task { await store.refreshIfStale() }
@@ -21,6 +22,16 @@ struct ContentView: View {
         HStack(spacing: 10) {
             Text("Usage")
                 .font(.system(.title3, design: .rounded).weight(.semibold))
+            @Bindable var store = store
+            Picker("Show", selection: $store.showsRemaining) {
+                Text("Used").tag(false)
+                Text("Left").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .fixedSize()
+            .help("Show how much of each limit is used, or how much is left")
             Spacer()
             if let updated = store.updatedAt {
                 TimelineView(.periodic(from: .now, by: 30)) { _ in
@@ -76,35 +87,7 @@ struct ProviderCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 9) {
-                ProviderMark(kind: usage.kind, size: usage.account == nil ? 22 : 30)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(usage.kind.title)
-                            .font(.system(.headline, design: .rounded))
-                        if let plan = usage.plan {
-                            Text(plan)
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .foregroundStyle(usage.kind.tint)
-                                .background(usage.kind.tint.opacity(0.14), in: Capsule())
-                                .lineLimit(1)
-                        }
-                    }
-                    HStack {
-                        if let account = usage.account {
-                            Text(account)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        Spacer(minLength: 4)
-                        usage.chips
-                    }
-                }
-            }
+            ProviderHeader(usage: usage)
 
             if usage.windows.isEmpty && usage.error == nil {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity)
@@ -138,12 +121,27 @@ struct MenuBarLabel: View {
     let store: UsageStore
 
     var body: some View {
-        HStack(spacing: 4) {
+        let value = store.peak.map { store.showsRemaining ? 1 - $0 : $0 }
+        Image(nsImage: Self.image(value.map { $0.formatted(.percent.precision(.fractionLength(0))) }))
+            .help(store.showsRemaining ? "Least left on any limit" : "Highest limit usage across all tools")
+    }
+
+    /// The status bar draws an Image and a Text side by side without aligning them (and drops
+    /// symbols embedded in Text), so render both into one template image, centered together.
+    @MainActor static func image(_ text: String?) -> NSImage {
+        let content = HStack(spacing: 4) {
             Image(systemName: "gauge.with.dots.needle.33percent")
-            if let peak = store.peak {
-                Text(peak, format: .percent.precision(.fractionLength(0)))
-            }
+            if let text { Text(text).monospacedDigit() }
         }
-        .help("Highest limit usage across all tools")
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(.black)
+        .padding(.vertical, 1)
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        let image = renderer.nsImage ?? NSImage(systemSymbolName: "gauge.with.dots.needle.33percent",
+                                                accessibilityDescription: "Usage")!
+        image.isTemplate = true // tinted by the menu bar for light and dark appearances
+        return image
     }
 }

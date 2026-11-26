@@ -19,6 +19,7 @@ struct GeminiWidget: Widget {
 private func providerConfiguration(_ kind: ProviderUsage.Kind) -> some WidgetConfiguration {
     StaticConfiguration(kind: "\(kind.rawValue)-usage", provider: Provider()) { entry in
         ProviderWidgetView(kind: kind, entry: entry)
+            .environment(\.showsRemaining, entry.snapshot?.showsRemaining ?? false)
             .containerBackground(.background, for: .widget)
     }
     // Plain Strings: interpolated literals become LocalizedStringKeys with arguments,
@@ -36,7 +37,7 @@ struct ProviderWidgetView: View {
     private var usage: ProviderUsage? { entry.snapshot?.usages.first { $0.kind == kind } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: family == .systemSmall ? 10 : 8) {
             header
             if let usage, !usage.windows.isEmpty {
                 if family == .systemSmall {
@@ -64,7 +65,7 @@ struct ProviderWidgetView: View {
     }
 
     private var legend: some View {
-        Text("% used").font(.system(size: 9)).foregroundStyle(.tertiary).fixedSize()
+        Text("% \(metricName(remaining: entry.snapshot?.showsRemaining ?? false))").font(.system(size: 9)).foregroundStyle(.tertiary).fixedSize()
     }
 
     /// Small has room for two rows. Gemini gets one per model group ("Gemini", "Claude & GPT"),
@@ -81,22 +82,17 @@ struct ProviderWidgetView: View {
         return order.prefix(2).compactMap { groups[$0] }
     }
 
-    private var header: some View {
-        HStack(spacing: 6) {
-            ProviderMark(kind: kind, size: 18)
-            Text(family == .systemSmall && kind == .claude ? "Claude" : kind.title)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-            if family != .systemSmall, let account = usage?.account {
-                Text(account)
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-            }
-            Spacer(minLength: 4)
-            if family == .systemSmall {
+    @ViewBuilder private var header: some View {
+        if family != .systemSmall, let usage {
+            ProviderHeader(usage: usage, compact: true)
+        } else {
+            HStack(spacing: 6) {
+                ProviderMark(kind: kind, size: 18)
+                Text(kind == .claude ? "Claude" : kind.title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
                 legend
-            } else {
-                usage?.chips
             }
         }
     }

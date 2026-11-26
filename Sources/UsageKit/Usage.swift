@@ -26,19 +26,42 @@ public struct ProviderUsage: Identifiable, Codable, Hashable, Sendable {
     public var plan: String?
     public var account: String?
     public var windows: [UsageWindow]
-    public var resets: Int?   // limit resets you can redeem (Claude Code, Codex)
-    public var credits: Int?  // Google One AI credit balance (Gemini)
+    public var balances: [Balance] // resets, credits, extra usage: shown as pills
     public var error: String?
 
     public init(kind: Kind, plan: String? = nil, account: String? = nil, windows: [UsageWindow] = [],
-                resets: Int? = nil, credits: Int? = nil, error: String? = nil) {
+                balances: [Balance] = [], error: String? = nil) {
         self.kind = kind
         self.plan = plan
         self.account = account
         self.windows = windows
-        self.resets = resets
-        self.credits = credits
+        self.balances = balances
         self.error = error
+    }
+}
+
+/// Something a tool lets you spend beyond its limits, shown as a pill: "4 resets", "0 AI credits".
+public struct Balance: Codable, Hashable, Sendable {
+    public let symbol: String  // SF Symbol
+    public let text: String
+    public let available: Bool // something to use (or switched on): drawn in orange
+    public let help: String
+
+    public init(symbol: String, text: String, available: Bool, help: String) {
+        self.symbol = symbol
+        self.text = text
+        self.available = available
+        self.help = help
+    }
+
+    public static func resets(_ count: Int) -> Balance {
+        Balance(symbol: "ticket.fill", text: "\(count) \(count == 1 ? "reset" : "resets")",
+                available: count > 0, help: "Limit resets you can redeem")
+    }
+
+    public static func credits(_ amount: Double, unit: String, help: String) -> Balance {
+        Balance(symbol: "creditcard.fill", text: "\(amount.formatted(.number.precision(.fractionLength(0...2)))) \(unit)",
+                available: amount > 0, help: help)
     }
 }
 
@@ -54,10 +77,12 @@ public extension ProviderUsage {
 public struct Snapshot: Codable, Sendable {
     public var usages: [ProviderUsage]
     public var updatedAt: Date
+    public var showsRemaining: Bool? // the app's Used / Left switch, so widgets match it
 
-    public init(usages: [ProviderUsage], updatedAt: Date) {
+    public init(usages: [ProviderUsage], updatedAt: Date, showsRemaining: Bool? = nil) {
         self.usages = usages
         self.updatedAt = updatedAt
+        self.showsRemaining = showsRemaining
     }
 
     private static var url: URL? {
@@ -72,11 +97,12 @@ public struct Snapshot: Codable, Sendable {
         return try? JSONDecoder().decode(Snapshot.self, from: data)
     }
 
-    /// Returns true when the usage numbers changed (so the widget needs a reload).
+    /// Returns true when what the widgets show changed (so they need a reload).
     @discardableResult
     public func save() -> Bool {
         guard let url = Self.url, let data = try? JSONEncoder().encode(self) else { return false }
-        let changed = Self.load()?.usages != usages
+        let old = Self.load()
+        let changed = old?.usages != usages || old?.showsRemaining != showsRemaining
         try? data.write(to: url, options: .atomic)
         return changed
     }

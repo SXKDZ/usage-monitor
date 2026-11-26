@@ -18,15 +18,17 @@ enum ClaudeProvider {
         }
 
         // `cedar_ember=1` adds limit-reset grants ("resets"); they're only reported to Claude Code itself.
-        var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1")!)
+        var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage?cedar_ember=1")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         req.setValue("claude-cli/2.1.332 (external, cli)", forHTTPHeaderField: "User-Agent")
         req.setValue("cli", forHTTPHeaderField: "x-app")
         let json = try await HTTP.json(req)
         if let ember = json["cedar_ember"] as? JSON, ember["eligible"] as? Bool != false {
-            usage.resets = (ember["grants"] as? [JSON] ?? []).reduce(0) { $0 + Int(num($1["resets_left"]) ?? 0) }
+            let resets = (ember["grants"] as? [JSON] ?? []).reduce(0) { $0 + Int(num($1["resets_left"]) ?? 0) }
+            usage.balances.append(.resets(resets))
         }
+        if let spend = json["spend"] as? JSON { usage.balances += balances(spend) }
 
         func window(_ label: String, _ w: JSON?, _ key: String = "utilization") -> UsageWindow? {
             guard let w, let pct = num(w[key]) else { return nil }
@@ -48,6 +50,31 @@ enum ClaudeProvider {
         }
         usage.windows = windows.compactMap { $0 }
         return usage
+    }
+
+    /// Extra usage (pay-as-you-go past the plan limits) and any prepaid usage-credit balance.
+    private static func balances(_ spend: JSON) -> [Balance] {
+        let help = "Usage credits cover you when you hit your plan limits"
+        var out: [Balance] = []
+        if spend["enabled"] as? Bool == true {
+            let used = money(spend["used"]) ?? "$0"
+            let text = money(spend["limit"]).map { "\(used) of \($0) extra" } ?? "\(used) extra used"
+            out.append(Balance(symbol: "dollarsign.circle.fill", text: text, available: true, help: help))
+        } else {
+            out.append(Balance(symbol: "dollarsign.circle.fill", text: "Extra usage off", available: false, help: help))
+        }
+        if let balance = money(spend["balance"]) {
+            out.append(Balance(symbol: "creditcard.fill", text: "\(balance) credits",
+                               available: !balance.hasPrefix("$0"), help: help))
+        }
+        return out
+    }
+
+    /// {"amount_minor": 1250, "currency": "USD", "exponent": 2} → "$12.50"
+    private static func money(_ value: Any?) -> String? {
+        guard let m = value as? JSON, let minor = num(m["amount_minor"]) else { return nil }
+        let amount = minor / pow(10, num(m["exponent"]) ?? 2)
+        return amount.formatted(.currency(code: m["currency"] as? String ?? "USD").precision(.fractionLength(0...2)))
     }
 
     /// "max" + "default_claude_max_5x" → "Max 5×"
