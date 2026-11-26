@@ -17,9 +17,6 @@ final class UsageStore {
         }
     }
 
-    /// Highest usage across every window — "how close am I to any limit".
-    var peak: Double? { usages.flatMap(\.windows).map(\.used).max() }
-
     init() {
         // Start from the last snapshot so the popover isn't empty while the first fetch runs.
         let last = Snapshot.load()

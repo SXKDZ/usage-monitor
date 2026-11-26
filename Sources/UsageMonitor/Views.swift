@@ -121,19 +121,29 @@ struct MenuBarLabel: View {
     let store: UsageStore
 
     var body: some View {
-        let value = store.peak.map { store.showsRemaining ? 1 - $0 : $0 }
-        Image(nsImage: Self.image(value.map { $0.formatted(.percent.precision(.fractionLength(0))) }))
-            .help(store.showsRemaining ? "Least left on any limit" : "Highest limit usage across all tools")
+        // Each tool's tightest limit next to its symbol, following the Used / Left switch.
+        let items = store.usages.map { usage -> (symbol: String, text: String) in
+            let peak = usage.windows.map(\.used).max()
+            let value = peak.map { store.showsRemaining ? 1 - $0 : $0 }
+            return (usage.kind.symbol, value?.formatted(.percent.precision(.fractionLength(0))) ?? "–")
+        }
+        Image(nsImage: Self.image(items))
+            .help(store.showsRemaining ? "Least left on each tool's limits" : "Most used of each tool's limits")
     }
 
     /// The status bar draws an Image and a Text side by side without aligning them (and drops
-    /// symbols embedded in Text), so render both into one template image, centered together.
-    @MainActor static func image(_ text: String?) -> NSImage {
-        let content = HStack(spacing: 4) {
-            Image(systemName: "gauge.with.dots.needle.33percent")
-            if let text { Text(text).monospacedDigit() }
+    /// symbols embedded in Text), so render everything into one template image, centered together.
+    @MainActor static func image(_ items: [(symbol: String, text: String)]) -> NSImage {
+        let content = HStack(spacing: 9) {
+            ForEach(items.indices, id: \.self) { i in
+                HStack(spacing: 3) {
+                    Image(systemName: items[i].symbol)
+                        .font(.system(size: items[i].symbol.hasPrefix("chevron") ? 8.5 : 11, weight: .bold))
+                    Text(items[i].text).monospacedDigit()
+                }
+            }
         }
-        .font(.system(size: 13, weight: .medium))
+        .font(.system(size: 12.5, weight: .medium))
         .foregroundStyle(.black)
         .padding(.vertical, 1)
 
