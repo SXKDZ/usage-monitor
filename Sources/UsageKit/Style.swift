@@ -237,15 +237,7 @@ public struct ProviderHeader: View {
                     Text(usage.kind.title)
                         .font(compact ? .caption.weight(.semibold) : .system(.headline, design: .rounded))
                         .lineLimit(1)
-                    if let plan = usage.plan {
-                        Text(plan)
-                            .font(compact ? .system(size: 9.5, weight: .semibold) : .caption2.weight(.semibold))
-                            .padding(.horizontal, compact ? 5 : 6)
-                            .padding(.vertical, compact ? 1 : 2)
-                            .foregroundStyle(usage.kind.tint)
-                            .background(usage.kind.tint.opacity(0.14), in: Capsule())
-                            .lineLimit(1)
-                    }
+                    if let plan = usage.plan { PlanBadge(plan: plan, kind: usage.kind, compact: compact) }
                 }
                 HStack(spacing: 4) {
                     if let account = usage.account {
@@ -260,5 +252,29 @@ public struct ProviderHeader: View {
                 }
             }
         }
+    }
+}
+
+/// The subscription plan ("Max 5×") in the tool's color.
+public struct PlanBadge: View {
+    let plan: String
+    let kind: ProviderUsage.Kind
+    var compact = false
+
+    public init(plan: String, kind: ProviderUsage.Kind, compact: Bool = false) {
+        self.plan = plan
+        self.kind = kind
+        self.compact = compact
+    }
+
+    public var body: some View {
+        Text(plan)
+            .font(compact ? .system(size: 9.5, weight: .semibold) : .caption2.weight(.semibold))
+            .padding(.horizontal, compact ? 5 : 6)
+            .padding(.vertical, compact ? 1 : 2)
+            .foregroundStyle(kind.tint)
+            .background(kind.tint.opacity(0.14), in: Capsule())
+            .lineLimit(1)
+            .fixedSize()
     }
 }

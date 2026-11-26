@@ -56,10 +56,17 @@ struct ContentView: View {
 }
 
 private struct SettingsMenu: View {
+    @Environment(UsageStore.self) private var store
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
+        @Bindable var store = store
         Menu {
+            Picker("Menu Bar Shows", selection: $store.menuBarTool) {
+                ForEach(ProviderUsage.Kind.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }
+                Divider()
+                Text("Closest to a Limit").tag(ProviderUsage.Kind?.none)
+            }
             Toggle("Launch at Login", isOn: $launchAtLogin)
             Divider()
             Button("Quit Usage Monitor") { NSApp.terminate(nil) }
@@ -121,14 +128,30 @@ struct MenuBarLabel: View {
     let store: UsageStore
 
     var body: some View {
-        // Each tool's tightest limit next to its symbol, following the Used / Left switch.
-        let items = store.usages.map { usage -> (symbol: String, text: String) in
-            let peak = usage.windows.map(\.used).max()
-            let value = peak.map { store.showsRemaining ? 1 - $0 : $0 }
-            return (usage.kind.symbol, value?.formatted(.percent.precision(.fractionLength(0))) ?? "–")
+        // The chosen tool's tightest limit (or the tightest across all tools), with that tool's symbol.
+        let candidates = store.usages.filter { store.menuBarTool == nil || $0.kind == store.menuBarTool }
+        let tightest = candidates
+            .compactMap { usage in usage.windows.map(\.used).max().map { (usage.kind, $0) } }
+            .max { $0.1 < $1.1 }
+        let items: [(symbol: String, text: String)] = if let (kind, used) = tightest {
+            [(kind.symbol, (store.showsRemaining ? 1 - used : used).formatted(.percent.precision(.fractionLength(0))))]
+        } else if let kind = store.menuBarTool {
+            [(kind.symbol, "–")]
+        } else {
+            [("gauge.with.dots.needle.33percent", "")]
         }
         Image(nsImage: Self.image(items))
-            .help(store.showsRemaining ? "Least left on each tool's limits" : "Most used of each tool's limits")
+            .help(summary)
+    }
+
+    /// Every tool's tightest limit, for the tooltip.
+    private var summary: String {
+        store.usages.map { usage in
+            let value = usage.windows.map(\.used).max().map { store.showsRemaining ? 1 - $0 : $0 }
+            let text = value?.formatted(.percent.precision(.fractionLength(0))) ?? "–"
+            return "\(usage.kind.title): \(text) \(metricName(remaining: store.showsRemaining))"
+        }
+        .joined(separator: "\n")
     }
 
     /// The status bar draws an Image and a Text side by side without aligning them (and drops
@@ -139,7 +162,7 @@ struct MenuBarLabel: View {
                 HStack(spacing: 3) {
                     Image(systemName: items[i].symbol)
                         .font(.system(size: items[i].symbol.hasPrefix("chevron") ? 8.5 : 11, weight: .bold))
-                    Text(items[i].text).monospacedDigit()
+                    if !items[i].text.isEmpty { Text(items[i].text).monospacedDigit() }
                 }
             }
         }

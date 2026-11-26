@@ -17,6 +17,14 @@ final class UsageStore {
         }
     }
 
+    /// Which tool the menu bar number follows; nil means whichever is closest to a limit.
+    var menuBarTool: ProviderUsage.Kind? = {
+        let raw = UserDefaults.standard.string(forKey: "menuBarTool") ?? ProviderUsage.Kind.claude.rawValue
+        return ProviderUsage.Kind(rawValue: raw) // "auto" → nil
+    }() {
+        didSet { UserDefaults.standard.set(menuBarTool?.rawValue ?? "auto", forKey: "menuBarTool") }
+    }
+
     init() {
         // Start from the last snapshot so the popover isn't empty while the first fetch runs.
         let last = Snapshot.load()

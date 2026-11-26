@@ -46,7 +46,7 @@ struct ProviderWidgetView: View {
                     }
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18, alignment: .top), count: 2),
-                              alignment: .leading, spacing: 10) {
+                              alignment: .leading, spacing: 8) {
                         ForEach(usage.windows.prefix(4)) {
                             LimitRow(window: $0, kind: kind, now: entry.date, density: .tile)
                         }
@@ -57,10 +57,14 @@ struct ProviderWidgetView: View {
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(3)
             }
             Spacer(minLength: 0)
-        }
-        // On medium the header holds the reset-cards pill, so the legend sits apart in the corner.
-        .overlay(alignment: .bottomTrailing) {
-            if family != .systemSmall { legend }
+            if family != .systemSmall {
+                // Balances in the bottom-left corner, the legend in the bottom-right.
+                HStack(spacing: 4) {
+                    ForEach(usage?.balances ?? [], id: \.self) { BalanceChip($0, compact: true) }
+                    Spacer(minLength: 4)
+                    legend
+                }
+            }
         }
     }
 
@@ -83,17 +87,22 @@ struct ProviderWidgetView: View {
     }
 
     @ViewBuilder private var header: some View {
-        if family != .systemSmall, let usage {
-            ProviderHeader(usage: usage, compact: true)
-        } else {
-            HStack(spacing: 6) {
-                ProviderMark(kind: kind, size: 18)
-                Text(kind == .claude ? "Claude" : kind.title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                legend
+        HStack(spacing: 6) {
+            ProviderMark(kind: kind, size: 18)
+            Text(family == .systemSmall && kind == .claude ? "Claude" : kind.title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize()
+            if family != .systemSmall {
+                if let plan = usage?.plan { PlanBadge(plan: plan, kind: kind, compact: true) }
+                if let account = usage?.account {
+                    Text(account)
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
             }
+            Spacer(minLength: 4)
+            if family == .systemSmall { legend }
         }
     }
 }
