@@ -175,7 +175,7 @@ private struct LargeView: View {
                         }
                         Spacer(minLength: 4)
                         if let cards = usage.resetCards {
-                            Label("\(cards)", systemImage: "ticket.fill")
+                            Label("\(cards) reset \(cards == 1 ? "card" : "cards")", systemImage: "ticket.fill")
                                 .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                         }
                     }

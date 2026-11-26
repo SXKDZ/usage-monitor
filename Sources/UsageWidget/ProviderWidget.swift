@@ -46,9 +46,10 @@ struct ProviderWidgetView: View {
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18, alignment: .top), count: 2),
                               alignment: .leading, spacing: 10) {
-                        ForEach(usage.windows.prefix(4)) {
+                        ForEach(usage.windows.prefix(usage.resetCards == nil ? 4 : 3)) {
                             LimitRow(window: $0, kind: kind, now: entry.date, density: .tile)
                         }
+                        if let cards = usage.resetCards { ResetCardsTile(count: cards) }
                     }
                 }
             } else {
@@ -85,12 +86,28 @@ struct ProviderWidgetView: View {
                     .lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            if family != .systemSmall, let cards = usage?.resetCards {
-                Label("\(cards)", systemImage: "ticket.fill")
-                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    .help("Reset cards")
-            }
             Text("% used").font(.system(size: 9)).foregroundStyle(.tertiary).fixedSize()
+        }
+    }
+}
+
+/// Reset cards as their own grid tile, laid out like a LimitRow so it can't be misread as a percentage.
+private struct ResetCardsTile: View {
+    let count: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("Reset cards").font(.caption.weight(.medium)).lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(count)")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(count > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary))
+            }
+            Color.clear.frame(height: 4)
+            Label(count == 0 ? "None available" : "\(count) available", systemImage: "ticket.fill")
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
     }
 }
