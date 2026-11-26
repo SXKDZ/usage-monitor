@@ -46,10 +46,9 @@ struct ProviderWidgetView: View {
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18, alignment: .top), count: 2),
                               alignment: .leading, spacing: 10) {
-                        ForEach(usage.windows.prefix(usage.resetCards == nil ? 4 : 3)) {
+                        ForEach(usage.windows.prefix(4)) {
                             LimitRow(window: $0, kind: kind, now: entry.date, density: .tile)
                         }
-                        if let cards = usage.resetCards { ResetCardsTile(count: cards) }
                     }
                 }
             } else {
@@ -58,6 +57,14 @@ struct ProviderWidgetView: View {
             }
             Spacer(minLength: 0)
         }
+        // On medium the header holds the reset-cards pill, so the legend sits apart in the corner.
+        .overlay(alignment: .bottomTrailing) {
+            if family != .systemSmall { legend }
+        }
+    }
+
+    private var legend: some View {
+        Text("% used").font(.system(size: 9)).foregroundStyle(.tertiary).fixedSize()
     }
 
     /// Small has room for two rows. Gemini gets one per model group ("Gemini", "Claude & GPT"),
@@ -86,28 +93,11 @@ struct ProviderWidgetView: View {
                     .lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 4)
-            Text("% used").font(.system(size: 9)).foregroundStyle(.tertiary).fixedSize()
-        }
-    }
-}
-
-/// Reset cards as their own grid tile, laid out like a LimitRow so it can't be misread as a percentage.
-private struct ResetCardsTile: View {
-    let count: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("Reset cards").font(.caption.weight(.medium)).lineLimit(1)
-                Spacer(minLength: 4)
-                Text("\(count)")
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(count > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary))
+            if family == .systemSmall {
+                legend
+            } else if let cards = usage?.resetCards {
+                ResetCardsChip(count: cards)
             }
-            Color.clear.frame(height: 4)
-            Label(count == 0 ? "None available" : "\(count) available", systemImage: "ticket.fill")
-                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
     }
 }
