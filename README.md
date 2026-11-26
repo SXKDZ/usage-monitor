@@ -2,7 +2,7 @@
 
 A minimal macOS menu bar app and set of desktop widgets that show how much of your
 **Claude Code**, **Codex** and **Gemini (Antigravity)** subscription limits you've used —
-5-hour and weekly windows, when each one resets, and any reset cards you can redeem.
+5-hour and weekly windows, when each one resets, any limit resets you can redeem, and your Gemini AI credit balance.
 
 It reuses the sign-ins those CLIs already keep on your Mac. There's no account to set up
 and no API key to paste.
@@ -14,7 +14,7 @@ and no API key to paste.
 - **Desktop widgets** (right-click the desktop → *Edit Widgets…* → search "Usage"):
   - *AI Usage*: all three tools in one widget (small, medium, large)
   - *Claude Code Usage*, *Codex Usage*, *Gemini Usage*: one block per tool (small, medium)
-- **Reset cards** for Codex and Claude Code, when your account has them.
+- **Resets** you can redeem for Codex and Claude Code, and the **AI credit** balance for Gemini.
 - Bars turn orange at 75% used and red at 90%.
 - Refreshes every 5 minutes; keeps showing the last good numbers if a fetch fails.
 

@@ -101,7 +101,7 @@ struct ProviderCard: View {
                                 .truncationMode(.middle)
                         }
                         Spacer(minLength: 4)
-                        if let cards = usage.resetCards { ResetCardsChip(count: cards) }
+                        usage.chips
                     }
                 }
             }

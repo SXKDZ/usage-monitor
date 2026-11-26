@@ -15,7 +15,8 @@ struct UsageMonitorApp: App {
                 for w in usage.windows {
                     print("  \(w.label): \(Int((w.used * 100).rounded()))%  resets \(w.resetsAt?.description ?? "-")")
                 }
-                if let cards = usage.resetCards { print("  reset cards: \(cards)") }
+                if let resets = usage.resets { print("  resets: \(resets)") }
+                if let credits = usage.credits { print("  AI credits: \(credits)") }
             }
             done.signal()
         }

@@ -166,19 +166,39 @@ public struct UsageBar: View {
     }
 }
 
-public struct ResetCardsChip: View {
+/// A labeled count in a pill, e.g. "4 resets" or "0 AI credits".
+public struct CountChip: View {
     let count: Int
+    let unit: (one: String, many: String)
+    let symbol: String
+    let help: String
 
-    public init(count: Int) { self.count = count }
+    public static func resets(_ count: Int) -> CountChip {
+        CountChip(count: count, unit: ("reset", "resets"), symbol: "ticket.fill",
+                  help: "Limit resets you can redeem")
+    }
+
+    public static func credits(_ count: Int) -> CountChip {
+        CountChip(count: count, unit: ("AI credit", "AI credits"), symbol: "sparkles",
+                  help: "Google One AI credits, used once your plan's quota runs out")
+    }
 
     public var body: some View {
-        Label("\(count) reset \(count == 1 ? "card" : "cards")", systemImage: "ticket.fill")
+        Label("\(count.formatted()) \(count == 1 ? unit.one : unit.many)", systemImage: symbol)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .foregroundStyle(count > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
             .background(Color.primary.opacity(0.06), in: Capsule())
             .fixedSize()
-            .help("Limit resets you can redeem")
+            .help(help)
+    }
+}
+
+public extension ProviderUsage {
+    /// Pills for whatever extras this tool reports.
+    @ViewBuilder var chips: some View {
+        if let resets { CountChip.resets(resets) }
+        if let credits { CountChip.credits(credits) }
     }
 }

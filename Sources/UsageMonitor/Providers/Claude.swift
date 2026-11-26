@@ -17,7 +17,7 @@ enum ClaudeProvider {
             throw UsageError("Sign-in expired — open Claude Code once to refresh it")
         }
 
-        // `cedar_ember=1` adds limit-reset grants ("reset cards"); they're only reported to Claude Code itself.
+        // `cedar_ember=1` adds limit-reset grants ("resets"); they're only reported to Claude Code itself.
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
@@ -25,7 +25,7 @@ enum ClaudeProvider {
         req.setValue("cli", forHTTPHeaderField: "x-app")
         let json = try await HTTP.json(req)
         if let ember = json["cedar_ember"] as? JSON, ember["eligible"] as? Bool != false {
-            usage.resetCards = (ember["grants"] as? [JSON] ?? []).reduce(0) { $0 + Int(num($1["resets_left"]) ?? 0) }
+            usage.resets = (ember["grants"] as? [JSON] ?? []).reduce(0) { $0 + Int(num($1["resets_left"]) ?? 0) }
         }
 
         func window(_ label: String, _ w: JSON?, _ key: String = "utilization") -> UsageWindow? {

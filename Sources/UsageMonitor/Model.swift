@@ -63,7 +63,11 @@ enum HTTP {
         case 429: throw UsageError("Rate limited — will retry shortly")
         default: throw UsageError("Request failed (HTTP \(status))")
         }
-        guard let json = parseJSON(data) else { throw UsageError("Unexpected response") }
+        // Some Google responses carry raw control characters inside strings, which
+        // JSONSerialization rejects; as JSON whitespace they're equivalent to spaces.
+        guard let json = parseJSON(Data(data.map { $0 < 0x20 ? 0x20 : $0 })) else {
+            throw UsageError("Unexpected response")
+        }
         return json
     }
 }

@@ -6,16 +6,10 @@ import UsageKit
 enum GeminiProvider {
     static func load() async throws -> ProviderUsage {
         let (token, email) = try await GeminiAuth.shared.accessToken()
-        // Same host and client identity as `agy`: the server only returns the Gemini group
-        // (with live numbers) to a versioned Antigravity CLI client on the daily host.
-        var req = URLRequest(url: URL(string: "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary")!)
-        req.httpMethod = "POST"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("antigravity/cli/1.5.17 (aidev_client; os_type=darwin; arch=arm64; auth_method=consumer)",
-                     forHTTPHeaderField: "User-Agent")
-        req.httpBody = Data("{}".utf8)
-        let json = try await HTTP.json(req)
+        async let summary = call("retrieveUserQuotaSummary", body: "{}", token: token)
+        // The plan and its AI credit balance; optional, so a failure here doesn't hide the limits.
+        async let assist = try? call("loadCodeAssist", body: #"{"metadata":{"ideType":"ANTIGRAVITY"}}"#, token: token)
+        let json = try await summary
 
         // Each model group shares a 5-hour and a weekly bucket.
         var windows: [UsageWindow] = []
@@ -37,7 +31,27 @@ enum GeminiProvider {
             }
         }
         guard !windows.isEmpty else { throw UsageError("No quota information returned") }
-        return ProviderUsage(kind: .gemini, plan: "Antigravity", account: email, windows: windows)
+
+        let tier = await assist?["paidTier"] as? JSON
+        // An omitted creditAmount means a zero balance (proto3 default).
+        let credits = (tier?["availableCredits"] as? [JSON]).map {
+            $0.reduce(0) { $0 + Int(num($1["creditAmount"]) ?? 0) }
+        }
+        return ProviderUsage(kind: .gemini, plan: tier?["name"] as? String ?? "Antigravity",
+                             account: email, windows: windows, credits: credits)
+    }
+
+    /// Same host and client identity as `agy`: the server only returns the Gemini group
+    /// (with live numbers) to a versioned Antigravity CLI client on the daily host.
+    private static func call(_ method: String, body: String, token: String) async throws -> JSON {
+        var req = URLRequest(url: URL(string: "https://daily-cloudcode-pa.googleapis.com/v1internal:\(method)")!)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("antigravity/cli/1.5.17 (aidev_client; os_type=darwin; arch=arm64; auth_method=consumer)",
+                     forHTTPHeaderField: "User-Agent")
+        req.httpBody = Data(body.utf8)
+        return try await HTTP.json(req)
     }
 }
 

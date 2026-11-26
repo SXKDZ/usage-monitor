@@ -36,7 +36,7 @@ enum CodexProvider {
         collect(json["rate_limit"])
         collect(json["code_review_rate_limit"], prefix: "Code review")
         usage.windows = windows.sorted { $0.seconds < $1.seconds }.map(\.window)
-        usage.resetCards = num((json["rate_limit_reset_credits"] as? JSON)?["available_count"]).map { Int($0) }
+        usage.resets = num((json["rate_limit_reset_credits"] as? JSON)?["available_count"]).map { Int($0) }
         return usage
     }
 

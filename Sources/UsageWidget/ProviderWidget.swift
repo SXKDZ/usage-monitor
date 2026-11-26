@@ -95,8 +95,8 @@ struct ProviderWidgetView: View {
             Spacer(minLength: 4)
             if family == .systemSmall {
                 legend
-            } else if let cards = usage?.resetCards {
-                ResetCardsChip(count: cards)
+            } else {
+                usage?.chips
             }
         }
     }

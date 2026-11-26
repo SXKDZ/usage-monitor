@@ -174,10 +174,7 @@ private struct LargeView: View {
                                 .lineLimit(1).truncationMode(.middle)
                         }
                         Spacer(minLength: 4)
-                        if let cards = usage.resetCards {
-                            Label("\(cards) reset \(cards == 1 ? "card" : "cards")", systemImage: "ticket.fill")
-                                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                        }
+                        usage.chips
                     }
                     ForEach(usage.activeWindows.prefix(3)) {
                         LimitRow(window: $0, kind: usage.kind, now: now, density: .compact)

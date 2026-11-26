@@ -26,16 +26,18 @@ public struct ProviderUsage: Identifiable, Codable, Hashable, Sendable {
     public var plan: String?
     public var account: String?
     public var windows: [UsageWindow]
-    public var resetCards: Int?
+    public var resets: Int?   // limit resets you can redeem (Claude Code, Codex)
+    public var credits: Int?  // Google One AI credit balance (Gemini)
     public var error: String?
 
     public init(kind: Kind, plan: String? = nil, account: String? = nil, windows: [UsageWindow] = [],
-                resetCards: Int? = nil, error: String? = nil) {
+                resets: Int? = nil, credits: Int? = nil, error: String? = nil) {
         self.kind = kind
         self.plan = plan
         self.account = account
         self.windows = windows
-        self.resetCards = resetCards
+        self.resets = resets
+        self.credits = credits
         self.error = error
     }
 }
